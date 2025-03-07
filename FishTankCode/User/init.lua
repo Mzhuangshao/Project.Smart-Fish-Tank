@@ -15,7 +15,7 @@ print("initializing success", "\n")
 
 print("Checking Device...", "\n")
 do
-    print("\n")
+    
 end
 print("Checking Device success", "\n")
 
