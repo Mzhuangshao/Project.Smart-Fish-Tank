@@ -89,9 +89,9 @@ do
     end
 end
 
--- 获取水质的函数
+-- 获取水质 
 do
-    local getWaterQualityPin = 0                     -- 定义获取水质数据的ADC channel
+    local getWaterQualityPin = 0                     -- 定义获取水质数据的GPIO引脚 -- D0
     gpio.mode(getWaterQualityPin, gpio.INPUT, gpio.PULLUP)  -- 设置GPIO为输入模式，并使能上拉电阻
     WaterQualityData = gpio.read(getWaterQualityPin) -- 返回GPIO读取的水质数据
 end
