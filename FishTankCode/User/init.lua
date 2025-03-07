@@ -1,72 +1,47 @@
 print("8266 Success", "\n")
 print("initializing...", "\n")
 local getTemperatureData = require("ds18b20") -- 引用前置库ds18b20
+local getTemperatureDataPin = 3               -- 定义获取温度数据的GPIO口 -- D3 引脚连接DS18B20
 local WaterLevelData                          -- 获取水位
 local WaterQualityData                        -- 获取水质
-local TemperatureData                         -- 获取温度
-local Device_DS18B20                          -- 定义DS18B20传感器
-local Device_Water_Sensor                     -- 定义水位传感器
-local Device_Water_Quality                    -- 定义水质传感器
-local debugMode = false                       -- 调试模式开关
+local TemperatureData                    -- 获取温度
+-- local Device_DS18B20                          -- 定义DS18B20传感器
+-- local Device_Water_Sensor                     -- 定义水位传感器
+-- local Device_Water_Quality                    -- 定义水质传感器
+local debugMode = false -- 调试模式开关
 print("initializing success", "\n")
 
 -- ########################### --
 
 print("Checking Device...", "\n")
 do
-    if getTemperatureData.sens then
-        print("Total number of DS18B20 sensors: " .. #getTemperatureData.sens)
-    end
+    print("\n")
 end
 print("Checking Device success", "\n")
 
 -- ########################### --
 
-function printDataLocal()                       -- 本地打印数据
-    if debugMode == true then
-        print(" ===== Debug mode is on ===== ") -- 调试模式
-        function TemperatureDataReadoutInDebugMode(temp)
-            if getTemperatureData.sens then
-                print("Total number of DS18B20 sensors: " .. #getTemperatureData.sens)
-                for i, s in ipairs(getTemperatureData.sens) do
-                    print(
-                        string.format(
-                            "  sensor #%d address: %s%s",
-                            i,
-                            ("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X"):format(s:byte(1, 8)),
-                            s:byte(9) == 1 and " (parasite)" or ""
-                        )
-                    )
-                end
-            end
-            for addr, temp in pairs(temp) do
-                print(
-                    string.format(
-                        "Sensor[%s] Temp: %s °C",
-                        ("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X"):format(addr:byte(1, 8)),
-                        temp
-                    )
-                )
-            end
-        end
-    else -- 正常输出模式
-        -- print("--Start Print Data--")
-        print("Water Level: " .. WaterLevelData, "\n")
-        print("Temperature: %s °C" .. TemperatureData, "\n")
-        print("Water Quality: " .. WaterQualityData, "\n")
+function printDataLocal()     -- 本地打印数据
+    if debugMode == true then -- 调试模式
+        print(" ===== Debug mode is on ===== ")
+    else                      -- 正常输出模式
+        print("--Start Print Data--")
+        print("Water Level: " .. WaterLevelData, "\n")     -- 打印水位数据
+        print("Temperature: ",TemperatureData,"°C\n") -- 打印DS18B20传感器数据
+        print("Water Quality: " .. WaterQualityData, "\n") -- 打印水质数据
         -- print("--End Print Data--")
     end
 end
 
 -- ########################### --
 
-local T = tmr.create()
-T:register(2000, 1,
+local Timer1 = tmr.create()
+Timer1:register(2000, 1,
     function()
+        getTemperatureData:read_temp(TemperatureDataReadout, getTemperatureDataPin, getTemperatureData.C)
         printDataLocal()
-    end
-)
-T:start()
+    end)
+Timer1:start()
 
 -- ########################### --
 
@@ -77,21 +52,17 @@ do
 end
 
 -- 获取温度
-do
-    local getTemperatureDataPin = 3 -- 定义获取温度数据的GPIO口 -- D3 引脚连接DS18B20
-    getTemperatureData:read_temp(TemperatureDataReadout, getTemperatureDataPin, getTemperatureData.C)
-    function TemperatureDataReadout(temp)
-        if getTemperatureData.sens then
-            for temp in pairs(temp) do
-                TemperatureData = (string.format("%.2f", temp))
-            end
+function TemperatureDataReadout(temp)
+    for _, temp in pairs(temp) do
+        if temp then
+            TemperatureData = string.format("%s", temp)
         end
     end
 end
 
--- 获取水质 
+-- 获取水质
 do
-    local getWaterQualityPin = 0                     -- 定义获取水质数据的GPIO引脚 -- D0
-    gpio.mode(getWaterQualityPin, gpio.INPUT, gpio.PULLUP)  -- 设置GPIO为输入模式，并使能上拉电阻
-    WaterQualityData = gpio.read(getWaterQualityPin) -- 返回GPIO读取的水质数据
+    local getWaterQualityPin = 0                           -- 定义获取水质数据的GPIO引脚 -- D0
+    gpio.mode(getWaterQualityPin, gpio.INPUT, gpio.PULLUP) -- 设置GPIO为输入模式，并使能上拉电阻
+    WaterQualityData = gpio.read(getWaterQualityPin)       -- 返回GPIO读取的水质数据
 end

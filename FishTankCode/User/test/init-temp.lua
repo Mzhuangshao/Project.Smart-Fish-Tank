@@ -15,7 +15,6 @@ function TemperatureReadout(temp)
         print(string.format("Sensor[%s] Temp: %s °C",
             ('%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X'):format(addr:byte(1, 8)), temp))
     end
-
 end
 
 -- 每隔5秒读取一次温度
