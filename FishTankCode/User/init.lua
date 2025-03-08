@@ -1,18 +1,21 @@
 print("8266 Success", "\n")
 print("initializing...", "\n")
 local getTemperatureData = require("ds18b20") -- 引用前置库ds18b20
+local powerOLEDDisplay = require("oled")      -- 引用前置库oled
+local OLEDDisplay = powerOLEDDisplay.init()   -- 初始化OLED显示屏
+-- 定义全局变量
 local getTemperatureDataPin = 3               -- 定义获取水温数据的GPIO口 -- D3 引脚连接DS18B20
 local WaterLevelData                          -- 获取水位
 local WaterQualityData                        -- 获取水质
 local TemperatureData = 0                     -- 获取水温
-local WaterLevelStateTooLow = 480             -- 定义水位状态：过低
-local WaterLevelStateLow = 520                -- 定义水位状态：低，处于Low与High之间是正常水位
-local WaterLevelStateHigh = 560               -- 定义水位状态：高，处于Low与High之间是正常水位
-local WaterLevelStateTooHigh = 600            -- 定义水位状态：过高
+local WaterLevelStateTooLow = 480             -- 定义水位：过低
+local WaterLevelStateLow = 520                -- 定义水位：较低，处于Low与High之间是正常水位
+local WaterLevelStateHigh = 560               -- 定义水位：较高，处于Low与High之间是正常水位
+local WaterLevelStateTooHigh = 600            -- 定义水位：过高
 local WaterQualityStateNormal = 1             -- 定义水质状态：正常
 local TemperatureStateTooHigh = 22            -- 定义水温：过高
-local TemperatureStateHigh = 18               -- 定义水温：高，处于Low与High之间是正常水温
-local TemperatureStateLow = 13                -- 定义水温：低，处于Low与High之间是正常水温
+local TemperatureStateHigh = 18               -- 定义水温：较高，处于Low与High之间是正常水温
+local TemperatureStateLow = 13                -- 定义水温：较低，处于Low与High之间是正常水温
 local TemperatureStateTooLow = 10             -- 定义水温：过低
 local debugMode = false                       -- 调试模式开关
 print("initializing success", "\n")
@@ -39,7 +42,7 @@ print("initializing success", "\n")
 
 local function printDataLocal()                           -- 本地打印数据
     if debugMode == true then                             -- 调试模式
-        print(" ===== Debug mode is on ===== ")
+        print(" ========= Debug mode ========= ")
         print("Water Level: " .. WaterLevelData)          -- 打印水位数据
         print("Temperature: " .. TemperatureData .. "°C") -- 打印DS18B20传感器数据
         print("Water Quality: " .. WaterQualityData)      -- 打印水质数据
@@ -51,13 +54,12 @@ local function printDataLocal()                           -- 本地打印数据
     end
 end
 
-local Timer1 = tmr.create()
-Timer1:register(2000, 1,
+local TimerCallPrintDataLocal = tmr.create()
+TimerCallPrintDataLocal:register(2000, 1,
     function()
-        getTemperatureData:read_temp(TemperatureDataReadout, getTemperatureDataPin, getTemperatureData.C)
         printDataLocal()
     end)
-Timer1:start()
+TimerCallPrintDataLocal:start()
 
 -- ## 数据获取 ##################### --
 
@@ -68,11 +70,18 @@ do
         WaterLevelData = adc.read(getWaterLevelPin) -- 返回ADC读取的水位数据
     end
 
-    Ticker1 = tmr.create()
-    Ticker1:alarm(1000, tmr.ALARM_AUTO, getWaterLevelData) -- 定时1秒读取水位数据
+    TimerWL = tmr.create()
+    TimerWL:alarm(1000, tmr.ALARM_AUTO, getWaterLevelData) -- 定时1秒读取水位数据
 end
 
 -- 获取水温
+do
+    local function getTemperatureValue()
+        getTemperatureData:read_temp(TemperatureDataReadout, getTemperatureDataPin, getTemperatureData.C)
+    end
+    TimerTD = tmr.create()
+    TimerTD:alarm(1000, tmr.ALARM_AUTO, getTemperatureValue)    -- 定时1秒读取水位数据
+end
 function TemperatureDataReadout(temp)                               -- 定义DS18B20传感器数据读取回调函数
     for _, temp in pairs(temp) do                                   -- 遍历temp数组，寻找水温值
         if temp then                                                -- 如果检测到水温值
@@ -90,8 +99,8 @@ do
         WaterQualityData = gpio.read(getWaterQualityPin)   -- 返回GPIO读取的水质数据
     end
 
-    Ticker2 = tmr.create()
-    Ticker2:alarm(1000, tmr.ALARM_AUTO, getWaterQualityData) -- 定时1秒读取水质数据
+    TimerWQ = tmr.create()
+    TimerWQ:alarm(1000, tmr.ALARM_AUTO, getWaterQualityData) -- 定时1秒读取水质数据
 end
 
 -- ## 数据检查 ### --
@@ -113,17 +122,17 @@ function WaterLevelCheck()
 end
 
 function TemperatureCheck()
-    if TemperatureData == nil then
+    if TemperatureData == nil then                        -- 如果没有读取到DS18B20传感器数据，则打印“Temperature Unknown”
         print("Temperature Unknown")
-    elseif TemperatureData > TemperatureStateTooHigh then
+    elseif TemperatureData > TemperatureStateTooHigh then -- 水温过高
         print("Temperature is too high")
-    elseif TemperatureData > TemperatureStateHigh then
+    elseif TemperatureData > TemperatureStateHigh then    -- 水温较高
         print("Temperature is high")
-    elseif TemperatureData > TemperatureStateLow then
+    elseif TemperatureData > TemperatureStateLow then     --水温正常
         print("Temperature is normal")
-    elseif TemperatureData > TemperatureStateTooLow then
+    elseif TemperatureData > TemperatureStateTooLow then  -- 水温较低
         print("Temperature is low")
-    else
+    else                                                  -- 水温过低
         print("Temperature is too low")
     end
 end
