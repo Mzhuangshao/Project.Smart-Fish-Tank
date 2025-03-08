@@ -1,48 +1,55 @@
 print("8266 Success", "\n")
 print("initializing...", "\n")
 local getTemperatureData = require("ds18b20") -- 引用前置库ds18b20
-local getTemperatureDataPin = 3               -- 定义获取温度数据的GPIO口 -- D3 引脚连接DS18B20
+local getTemperatureDataPin = 3               -- 定义获取水温数据的GPIO口 -- D3 引脚连接DS18B20
 local WaterLevelData                          -- 获取水位
 local WaterQualityData                        -- 获取水质
-local TemperatureData = 0                     -- 获取温度
--- local Device_DS18B20                          -- 定义DS18B20传感器
--- local Device_Water_Sensor                     -- 定义水位传感器
--- local Device_Water_Quality                    -- 定义水质传感器
-local WaterLevelStateTooLow = 480
-local WaterLevelStateLow = 520
-local WaterLevelStateHigh = 560
-local WaterLevelStateTooHigh = 600
-local WaterQualityStateNormal = 1
-local TemperatureStateTooHigh = 35
-local TemperatureStateHigh = 32
-local TemperatureStateLow = 28
-local TemperatureStateTooLow = 25
-local debugMode = false -- 调试模式开关
+local TemperatureData = 0                     -- 获取水温
+local WaterLevelStateTooLow = 480             -- 定义水位状态：过低
+local WaterLevelStateLow = 520                -- 定义水位状态：低，处于Low与High之间是正常水位
+local WaterLevelStateHigh = 560               -- 定义水位状态：高，处于Low与High之间是正常水位
+local WaterLevelStateTooHigh = 600            -- 定义水位状态：过高
+local WaterQualityStateNormal = 1             -- 定义水质状态：正常
+local TemperatureStateTooHigh = 22            -- 定义水温：过高
+local TemperatureStateHigh = 18               -- 定义水温：高，处于Low与High之间是正常水温
+local TemperatureStateLow = 13                -- 定义水温：低，处于Low与High之间是正常水温
+local TemperatureStateTooLow = 10             -- 定义水温：过低
+local debugMode = false                       -- 调试模式开关
 print("initializing success", "\n")
 
--- ########################### --
+-- ## 检查设备状态 #################### --
 
-print("Checking Device...", "\n")
-do
+-- print("Checking Device...", "\n")
+-- do
+--     getTemperatureData:read_temp(CheckDeviceDs18b20, getTemperatureDataPin, getTemperatureData.C)
+--     function CheckDeviceDs18b20(temp)
+--         if getTemperatureData.sens then
+--             print("Total number of DS18B20 sensors: " .. #getTemperatureData.sens)
+--             for i, s in ipairs(getTemperatureData.sens) do
+--                 print(string.format("  sensor #%d address: %s%s", i,
+--                     ('%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X'):format(s:byte(1, 8)),
+--                     s:byte(9) == 1 and " (parasite)" or ""))
+--             end
+--         end
+--     end
+-- end
+-- print("Checking Device success", "\n")
 
-end
-print("Checking Device success", "\n")
+-- ## 本地打印数据 #################### --
 
--- ########################### --
-
-function printDataLocal()                                 -- 本地打印数据
+local function printDataLocal()                           -- 本地打印数据
     if debugMode == true then                             -- 调试模式
         print(" ===== Debug mode is on ===== ")
-    else                                                  -- 正常输出模式
-        print("--Start Print Data--")
         print("Water Level: " .. WaterLevelData)          -- 打印水位数据
         print("Temperature: " .. TemperatureData .. "°C") -- 打印DS18B20传感器数据
         print("Water Quality: " .. WaterQualityData)      -- 打印水质数据
-        -- print("--End Print Data--")
+    else                                                  -- 正常输出模式
+        print("--- Start Print Data ---")
+        WaterLevelCheck()                                 -- 调用水位检查函数
+        TemperatureCheck()                                -- 调用水温检查函数
+        WaterQualityCheck()                               -- 调用水质检查函数
     end
 end
-
--- ########################### --
 
 local Timer1 = tmr.create()
 Timer1:register(2000, 1,
@@ -52,24 +59,24 @@ Timer1:register(2000, 1,
     end)
 Timer1:start()
 
--- ########################### --
+-- ## 数据获取 ##################### --
 
 -- 获取水位
 do
-    local getWaterLevelPin = 0 -- 定义获取水位数据的ADC channel -- A0
+    local getWaterLevelPin = 0                      -- 定义获取水位数据的ADC channel -- A0
     local function getWaterLevelData()
         WaterLevelData = adc.read(getWaterLevelPin) -- 返回ADC读取的水位数据
     end
 
     Ticker1 = tmr.create()
-    Ticker1:alarm(1000, tmr.ALARM_AUTO, getWaterLevelData)
+    Ticker1:alarm(1000, tmr.ALARM_AUTO, getWaterLevelData) -- 定时1秒读取水位数据
 end
 
--- 获取温度
-function TemperatureDataReadout(temp)
-    for _, temp in pairs(temp) do
-        if temp then
-            TemperatureData = tonumber(string.format("%.2f", temp))
+-- 获取水温
+function TemperatureDataReadout(temp)                               -- 定义DS18B20传感器数据读取回调函数
+    for _, temp in pairs(temp) do                                   -- 遍历temp数组，寻找水温值
+        if temp then                                                -- 如果检测到水温值
+            TemperatureData = tonumber(string.format("%.2f", temp)) -- 保留两位小数并写入TemperatureData变量
             --tonumber(TemperatureData)
         end
     end
@@ -79,13 +86,15 @@ end
 do
     local getWaterQualityPin = 2                           -- 定义获取水质数据的GPIO引脚 -- D0
     gpio.mode(getWaterQualityPin, gpio.INPUT, gpio.PULLUP) -- 设置GPIO为输入模式，并使能上拉电阻
-    function getWaterQualityData()
+    local function getWaterQualityData()
         WaterQualityData = gpio.read(getWaterQualityPin)   -- 返回GPIO读取的水质数据
     end
 
     Ticker2 = tmr.create()
-    Ticker2:alarm(1000, tmr.ALARM_AUTO, getWaterQualityData)
+    Ticker2:alarm(1000, tmr.ALARM_AUTO, getWaterQualityData) -- 定时1秒读取水质数据
 end
+
+-- ## 数据检查 ### --
 
 function WaterLevelCheck()
     if WaterLevelData == nil then

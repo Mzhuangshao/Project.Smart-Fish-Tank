@@ -1,6 +1,7 @@
 {
     "Lua.diagnostics.globals": [
-        "printData",
-        "printDataLocal"
+        "gpio",
+        "tmr",
+        "adc"
     ]
 }
