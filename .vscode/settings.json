@@ -2,6 +2,10 @@
     "Lua.diagnostics.globals": [
         "gpio",
         "tmr",
-        "adc"
+        "adc",
+        "getTemperatureData",
+        "i2c",
+        "disp",
+        "u8g2"
     ]
 }
